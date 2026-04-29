@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────
+# LaTeX build artifacts (report/)
+# ─────────────────────────────────────────
+*.aux
+*.bbl
+*.blg
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.synctex(busy)
+*.fls
+*.fdb_latexmk
+*.nav
+*.snm
+*.vrb
+*.glg
+*.glo
+*.gls
+*.ist
+*.acn
+*.acr
+*.alg
+*.xdy
+
+# ─────────────────────────────────────────
+# C / MPI build outputs
+# ─────────────────────────────────────────
+*.o
+*.out
+a.out
+
+# ─────────────────────────────────────────
+# OS / Editor junk
+# ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# ─────────────────────────────────────────
+# Python cache (generate_data.py)
+# ─────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo

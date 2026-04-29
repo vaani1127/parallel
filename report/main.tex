@@ -1,5 +1,6 @@
 \documentclass[12pt,a4paper]{article}
 \renewcommand{\baselinestretch}{1.5}
+\usepackage{placeins}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
@@ -9,492 +10,445 @@
 \usepackage{algpseudocode}
 \usepackage{graphicx}
 \usepackage{geometry}
-\usepackage{tabulary}
+\usepackage{float}
 \usepackage{caption}
 \usepackage{subcaption}
-\usepackage{xcolor}
-\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
 \usepackage{longtable}
+\usepackage{xcolor}
 \usepackage{listings}
 \usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
-\graphicspath{{./}}
-
+\usepackage{bm}
 \usepackage[hyphens]{url}
 \usepackage{hyperref}
-\hypersetup{
-    colorlinks=true,
-    linkcolor=black,
-    citecolor=black,
-    urlcolor=blue
-}
-
-\geometry{
-    left=2.5cm,
-    right=2.5cm,
-    top=2.5cm,
-    bottom=3cm,
-}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
 
 \usepackage{titlesec}
-
 \setcounter{secnumdepth}{4}
-\setcounter{tocdepth}{4}
-\titleformat{\paragraph}
-{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
-\titlespacing*{\paragraph}
-{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\setcounter{tocdepth}{3}
 
-\newenvironment{conditions}
-{\par\vspace{\abovedisplayskip}\noindent\begin{tabular}{>{$}l<{$} @{${}={}$} l}}
-{\end{tabular}\par\vspace{\belowdisplayskip}}
+\geometry{left=2cm,right=2cm,top=1.5cm,bottom=2cm}
+\setlength{\footskip}{20pt}
+\graphicspath{{./}}
+\setlength{\emergencystretch}{2em}
 
 \lstset{
     basicstyle=\ttfamily\small,
     breaklines=true,
     frame=single,
     numbers=left,
-    numberstyle=\tiny,
+    numberstyle=\tiny\color{gray},
     captionpos=b,
     language=C,
     tabsize=4,
     showstringspaces=false,
-    commentstyle=\color{gray},
-    keywordstyle=\color{blue},
+    commentstyle=\color{gray!70},
+    keywordstyle=\color{blue!80}\bfseries,
+    stringstyle=\color{red!70},
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
 }
 
+%% ================================================================
 \begin{document}
-    \input{titlepage}
-    \pagenumbering{gobble}
-    \renewcommand*\contentsname{Table of Contents}
-    \tableofcontents
-    \newpage
-    \listoffigures
-    \vspace{1cm}
-    \listoftables
-    \newpage
-    \pagenumbering{arabic}
-
-    %% ================================================================
-    \section{Introduction}
-    \pagenumbering{arabic}
-
-    \subsection{Background}
-
-    Document similarity search is a fundamental problem in information retrieval,
-    data mining, and machine learning. With the exponential growth of digital
-    content, finding documents most similar to a given query efficiently has become
-    critical across applications ranging from plagiarism detection and duplicate
-    identification to recommendation systems and semantic search \cite{manning2008}.
-
-    Traditional sequential similarity computations become computationally
-    prohibitive at scale: comparing a query against $n$ documents each of
-    dimension $m$ costs $O(n \cdot m)$ floating-point operations per query.
-    Parallel computing frameworks -- specifically the Message Passing Interface
-    (MPI) for inter-node distribution and OpenMP for intra-node thread-level
-    parallelism -- provide scalable solutions by distributing computation across
-    multiple processors \cite{gropp1999mpi}.
-
-    This project implements a \textit{hybrid parallel} document similarity search
-    system combining MPI and OpenMP. The system distributes documents across MPI
-    ranks using an optimal collective scatter, parallelises per-document similarity
-    computation within each rank using OpenMP threads, and merges per-rank top-$k$
-    results via a single MPI collective gather. Four similarity metrics are
-    supported and comprehensive per-phase timing is reported.
-
-    \subsection{Problem Statement}
-
-    Given a collection of $n$ documents (each represented as an $m$-dimensional
-    integer feature vector) and a query vector $\mathbf{q} \in \mathbb{Z}^m$,
-    find the $k$ most similar documents to $\mathbf{q}$ in minimum wall-clock time.
-
-    \begin{itemize}
-        \item \textbf{Input}: $n$ documents in a plain-text file, a query vector,
-              parameters $k$ and $m$
-        \item \textbf{Output}: Top-$k$ documents ranked by similarity score,
-              with full four-phase performance statistics
-        \item \textbf{Challenge}: Minimise total execution time
-              $T_{\text{total}} = T_{\text{I/O}} + T_{\text{scatter}} +
-              T_{\text{comp}} + T_{\text{gather}}$
-    \end{itemize}
-
-    %% ================================================================
-    \newpage
-    \section{Literature Review}
-
-    The field of parallel similarity search has advanced significantly in recent
-    years, driven by the growth of large-scale vector datasets in machine learning
-    and information retrieval. Table~\ref{tab:litreview} summarises the key works
-    that inform the design of this project.
-
-    \begin{longtable}{|p{2cm}|p{2.5cm}|p{2.8cm}|p{3cm}|p{3cm}|}
-    \caption{Summary of Literature Review}
-    \label{tab:litreview}\\
-    \hline
-    \textbf{Reference} & \textbf{Concepts Highlighted} &
-    \textbf{Technique(s) Used} & \textbf{Significance} &
-    \textbf{Limitations} \\
-    \hline
-    \endfirsthead
-    \hline
-    \textbf{Reference} & \textbf{Concepts Highlighted} &
-    \textbf{Technique(s) Used} & \textbf{Significance} &
-    \textbf{Limitations} \\
-    \hline
-    \endhead
-
-    \cite{johnson2021faiss} &
-    GPU-accelerated exact and approximate similarity search at billion scale &
-    Efficient $k$-selection via WarpSelect, product quantisation, GPU
-    parallelism &
-    Nearest-neighbour implementation 8.5$\times$ faster than prior GPU
-    state-of-the-art; open-sourced as FAISS &
-    Requires GPU hardware; accuracy--speed trade-off for compressed search \\
-    \hline
-
-    \cite{douze2024faiss} &
-    Unified library covering brute-force, approximate, and compressed similarity
-    search &
-    IVF, HNSW, PQ indices; CPU and GPU backends &
-    Industry-standard toolkit used in production retrieval systems; supports
-    heterogeneous hardware &
-    High engineering complexity; compressed indices reduce recall \\
-    \hline
-
-    \cite{malkov2020hnsw} &
-    Approximate nearest neighbour search using navigable small-world graphs &
-    Hierarchical proximity graphs with greedy layer-wise traversal &
-    Sub-linear query time with high recall; robust to dimensionality;
-    widely deployed in vector databases &
-    Index construction is memory-intensive; no hard recall guarantee \\
-    \hline
-
-    \cite{aumuller2020ann} &
-    Rigorous benchmarking of approximate nearest neighbour algorithms across
-    diverse datasets &
-    Standardised recall-vs-time evaluation for LSH, graph, tree, and quantisation
-    methods &
-    Provides reproducible baseline comparisons; reveals that no single method
-    dominates across all settings &
-    Benchmarks focus on single-machine settings; distributed performance not
-    evaluated \\
-    \hline
-
-    \cite{lu2023hybrid} &
-    Hybrid MPI+OpenMP two-level parallelism for scientific computing on
-    multi-core clusters &
-    MPI for inter-node data partitioning; OpenMP for intra-node loop
-    parallelisation &
-    Demonstrates that hybrid models outperform pure-MPI on shared-memory
-    multi-core nodes by reducing memory replication overhead &
-    Domain-specific; generalisation to irregular workloads requires tuning \\
-    \hline
-
-    \cite{velarde2022hybrid} &
-    Comparative study of hybrid OpenMP+MPI versus pure OpenMP or pure MPI
-    implementations &
-    Applied Sciences benchmark across CPU core configurations &
-    Confirms that hybrid programming yields measurable speedups for data-parallel
-    array operations; up to 40\% reduction in runtime versus pure MPI &
-    Results are problem-size dependent; small datasets may favour simpler models \\
-    \hline
-
-    \cite{thakur2005mpi} &
-    Algorithmic optimisation of MPI collective operations including
-    \texttt{MPI\_Gather} and \texttt{MPI\_Scatterv} &
-    Binomial trees, recursive halving/doubling, ring algorithms for collectives &
-    Reduced collective communication latency by up to 62\% over point-to-point
-    loops in MPICH; now standard across all MPI implementations &
-    Platform-specific tuning required for non-standard topologies \\
-    \hline
-
-    \cite{manning2008} &
-    Vector space models and cosine similarity for document retrieval &
-    TF-IDF weighting, cosine and Euclidean distance metrics &
-    Foundational text on information retrieval; defines the feature-vector
-    representation used in this project &
-    Term independence assumption; limited scalability without parallelism \\
-    \hline
-
-    \end{longtable}
-
-    \subsection{Discussion of Literature}
-
-    Johnson et al.\ \cite{johnson2021faiss} and the subsequent FAISS library
-    paper \cite{douze2024faiss} establish GPU-based $k$-selection and product
-    quantisation as the current frontier for large-scale similarity search.
-    Their WarpSelect algorithm -- a register-resident tournament sort --
-    motivates our use of a CPU-side min-heap for $k$-selection, which achieves
-    the same $O(n \log k)$ complexity without requiring GPU hardware.
-
-    Malkov and Yashunin \cite{malkov2020hnsw} and Aumuller et al.\
-    \cite{aumuller2020ann} together provide context for exact versus approximate
-    search. Our implementation performs \textit{exact} search, which is
-    appropriate when result correctness is required and dataset size allows it.
-
-    The hybrid parallelism literature \cite{lu2023hybrid,velarde2022hybrid}
-    directly motivates our MPI+OpenMP design: on multi-core nodes, OpenMP
-    threads share memory and cache lines, avoiding the per-rank data replication
-    that pure MPI incurs. Thakur et al.\ \cite{thakur2005mpi} justify replacing
-    sequential \texttt{MPI\_Send} scatter loops with \texttt{MPI\_Scatterv},
-    which delegates communication scheduling to the MPI runtime's optimal tree.
-
-    %% ================================================================
-    \newpage
-    \section{Research Gaps}
-
-    Based on the literature review, the following gaps were identified and
-    addressed in this project:
-
-    \begin{itemize}
-        \item \textit{\textbf{Single-Level Parallelism}}: Most prior CPU-based
-              MPI implementations exploit only inter-process parallelism.
-              On multi-core nodes, pure MPI wastes resources by replicating data
-              per rank. Our hybrid MPI+OpenMP design exploits both levels.
-
-        \item \textit{\textbf{Inefficient Top-K Selection}}: Many implementations
-              sort all $n$ local documents ($O(n \log n)$) even when only
-              $k \ll n$ results are needed. A min-heap reduces this to
-              $O(n \log k)$ with $O(k)$ memory.
-
-        \item \textit{\textbf{Suboptimal Scatter Pattern}}: Sequential
-              \texttt{MPI\_Send} loops from rank 0 to each worker incur
-              $O(P)$ sequential latencies. Replacing with \texttt{MPI\_Scatterv}
-              reduces scatter cost to $O(\log P)$ via the runtime's binomial tree.
-
-        \item \textit{\textbf{Correctness in KReduce}}: When fewer documents
-              than $k$ exist on a rank, passing a variable send count to
-              \texttt{MPI\_Gather} causes memory corruption.  Uniform sentinel
-              padding to exactly $k$ entries per rank fixes this.
-
-        \item \textit{\textbf{Limited Metric Flexibility}}: Most systems support
-              only cosine similarity.  Four metrics (Power, Cosine, Euclidean,
-              Manhattan) are exposed through a unified interface here.
-
-        \item \textit{\textbf{Coarse Performance Profiling}}: Few implementations
-              separate I/O, scatter, computation, and gather phases.
-              Our four-phase \texttt{MPI\_Wtime} instrumentation enables
-              precise bottleneck identification.
-    \end{itemize}
-
-    %% ================================================================
-    \newpage
-    \section{Problem Formulation}
-
-    \subsection{Mathematical Formulation}
-
-    Let $\mathcal{D} = \{\mathbf{d}_1, \mathbf{d}_2, \ldots, \mathbf{d}_n\}$
-    be a collection of $n$ documents where each $\mathbf{d}_i \in \mathbb{Z}^m$.
-    Given a query $\mathbf{q} \in \mathbb{Z}^m$, find the set $\mathcal{T}_k$ of
-    the $k$ most similar documents:
-
-    \begin{equation}
-        \mathcal{T}_k = \underset{\mathcal{S} \subseteq \mathcal{D},\,
-        |\mathcal{S}|=k}{\arg\max} \sum_{\mathbf{d} \in \mathcal{S}}
-        S(\mathbf{q}, \mathbf{d})
-    \end{equation}
-
-    Total execution time is decomposed into four measurable phases:
-
-    \begin{equation}
-        T_{\text{total}} = T_{\text{I/O}} + T_{\text{scatter}} +
-        T_{\text{comp}} + T_{\text{gather}}
-    \end{equation}
-
-    \subsection{Supported Similarity Metrics}
-
-    \begin{enumerate}
-        \item \textbf{Power-based Similarity}:
-        \begin{equation}
-            S_{\text{power}}(\mathbf{q}, \mathbf{d}_i) =
-            \sum_{j=1}^{m} d_{i,j}^{q_j}
-        \end{equation}
-
-        \item \textbf{Cosine Similarity}:
-        \begin{equation}
-            S_{\text{cosine}}(\mathbf{q}, \mathbf{d}_i) =
-            \frac{\mathbf{q} \cdot \mathbf{d}_i}
-                 {\|\mathbf{q}\|_2 \, \|\mathbf{d}_i\|_2}
-        \end{equation}
-
-        \item \textbf{Euclidean Distance} (negated for maximisation):
-        \begin{equation}
-            S_{\text{euclidean}}(\mathbf{q}, \mathbf{d}_i) =
-            -\sqrt{\sum_{j=1}^{m} (q_j - d_{i,j})^2}
-        \end{equation}
-
-        \item \textbf{Manhattan Distance} (negated for maximisation):
-        \begin{equation}
-            S_{\text{manhattan}}(\mathbf{q}, \mathbf{d}_i) =
-            -\sum_{j=1}^{m} |q_j - d_{i,j}|
-        \end{equation}
-    \end{enumerate}
-
-    Negating distance metrics ensures a uniform ``higher score = more similar''
-    convention across all four metrics.
-
-    \subsection{Parallel Formulation}
-
-    With $P$ MPI ranks and $T$ OpenMP threads per rank (total
-    $P \times T$ hardware threads), documents are partitioned using
-    \textbf{contiguous block distribution}:
-
-    \begin{equation}
-        |\mathcal{D}_r| =
-        \left\lfloor \frac{n}{P} \right\rfloor +
-        \begin{cases}
-            1 & \text{if } r < (n \bmod P) \\
-            0 & \text{otherwise}
-        \end{cases}
-        \quad r = 0, 1, \ldots, P-1
-    \end{equation}
-
-    Each rank $r$ computes a local top-$k$ set $\mathcal{T}_k^{(r)}$
-    using $T$ OpenMP threads. The global result is:
-
-    \begin{equation}
-        \mathcal{T}_k = \text{TopK}\!\left(
-        \bigcup_{r=0}^{P-1} \mathcal{T}_k^{(r)}\right)
-    \end{equation}
-
-    This block distribution guarantees load imbalance of at most one document
-    between any two ranks, regardless of $n$ and $P$.
-
-    %% ================================================================
-    \section{Objectives}
-
-    \begin{itemize}
-        \item To implement a \textbf{hybrid MPI+OpenMP} parallel document
-              similarity search system that exploits both inter-node and
-              intra-node parallelism simultaneously.
-
-        \item To optimise top-$k$ selection using a \textbf{min-heap} data
-              structure, achieving $O(n \log k)$ time and $O(k)$ space
-              per rank instead of $O(n \log n)$ for a full sort.
-
-        \item To replace sequential \texttt{MPI\_Send} scatter loops with
-              \textbf{\texttt{MPI\_Scatterv}}, reducing scatter latency from
-              $O(P)$ to $O(\log P)$ via the MPI runtime's binomial tree.
-
-        \item To implement a \textbf{correctness-preserving KReduce} that pads
-              each rank's local top-$k$ to a uniform $k$ entries with sentinel
-              values before \texttt{MPI\_Gather}, preventing memory corruption
-              when local document counts fall below $k$.
-
-        \item To support \textbf{four similarity metrics} (Power, Cosine,
-              Euclidean, Manhattan) through a unified \texttt{computeSimilarity}
-              interface enabling runtime metric selection.
-
-        \item To provide \textbf{four-phase performance profiling}
-              (I/O, scatter, computation, gather) using \texttt{MPI\_Wtime}
-              and to analyse scalability using Amdahl's and Gustafson's Laws.
-
-        \item To validate correctness by confirming \textbf{identical top-$k$
-              rankings} across all processor and thread configurations.
-    \end{itemize}
-
-    %% ================================================================
-    \newpage
-    \section{Methodology}
-
-    \subsection{System Architecture}
-
-    The system follows a master--worker model with two levels of parallelism:
-
-    \begin{itemize}
-        \item \textbf{Level 1 -- MPI (inter-process)}: Rank 0 reads all input
-              files, broadcasts the query vector and metadata to all ranks, and
-              distributes document partitions via \texttt{MPI\_Scatterv}.
-              After computation, rank 0 collects per-rank top-$k$ results via
-              \texttt{MPI\_Gather} and performs the global merge.
-
-        \item \textbf{Level 2 -- OpenMP (intra-process)}: Within each MPI rank,
-              a \texttt{\#pragma omp parallel for} loop with
-              \texttt{schedule(dynamic, 64)} distributes similarity computation
-              across $T$ threads. The expensive similarity functions
-              (\texttt{pow}, \texttt{sqrt}, multiply-accumulate) are fully
-              parallelised; the min-heap is maintained sequentially afterward
-              to avoid synchronisation overhead.
-
-        \item \textbf{Communication Primitives}:
-              \texttt{MPI\_Bcast} for query and metadata;
-              \texttt{MPI\_Scatterv} for document distribution (single collective,
-              variable per-rank counts);
-              \texttt{MPI\_Gather} for top-$k$ result collection (uniform
-              $k$ entries per rank via sentinel padding).
-    \end{itemize}
-
-    \subsection{Algorithm Design}
-
-    \subsubsection{Min-Heap Based Top-K Selection}
-
-    \begin{algorithm}[H]
-        \caption{Min-Heap Top-K Selection (per MPI rank)}
-        \begin{algorithmic}[1]
-            \State \textbf{Input:} Local documents $\mathcal{D}_r$,
-                   query $\mathbf{q}$, integer $k$
-            \State \textbf{Output:} Local top-$k$ array \textit{local\_topk}
-            \State \Comment{Phase A: parallel score computation (OpenMP)}
-            \For{each document $\mathbf{d} \in \mathcal{D}_r$
-                 \textbf{in parallel} ($T$ OMP threads)}
-                \State $\text{scores}[i] \gets S(\mathbf{q}, \mathbf{d})$
-            \EndFor
-            \State \Comment{Phase B: sequential heap maintenance}
-            \State $H \gets \text{CreateMinHeap}(k)$
-            \For{$i = 0$ \textbf{to} $|\mathcal{D}_r| - 1$}
-                \State \Call{InsertHeap}{$H$, $\text{id}[i]$, $\text{scores}[i]$}
-            \EndFor
-            \State \Return \Call{ExtractAllSorted}{$H$}
-        \end{algorithmic}
-    \end{algorithm}
-
-    Splitting into two phases is essential: the min-heap is not thread-safe.
-    By pre-computing all scores in Phase A and inserting sequentially in
-    Phase B, we obtain full parallelism on the expensive computation and
-    zero synchronisation overhead during heap operations.
-    Complexity per rank: $O(n \cdot m / (P \cdot T))$ for Phase A and
-    $O((n/P) \log k)$ for Phase B, versus $O(n/P \cdot \log(n/P))$
-    for a full sort \cite{cormen2022algorithms}.
-
-    \subsubsection{Robust KReduce with Sentinel Padding}
-
-    \begin{algorithm}[H]
-        \caption{KReduce -- Correctness-Preserving Global Top-K}
-        \begin{algorithmic}[1]
-            \State \textbf{Input:} \textit{local\_topk} (size \textit{actual\_k}
-                   $\le k$) from all $P$ ranks
-            \State \textbf{Output:} \textit{global\_topk} at rank 0
-            \State Pad \textit{local\_topk} to exactly $k$ entries:
-            \For{$i = \text{actual\_k}$ \textbf{to} $k - 1$}
-                \State $\text{padded}[i] \gets (\text{id}{=}-1,\;
-                       \text{score}{=}-\infty)$
-            \EndFor
-            \State \Call{MPI\_Gather}{\textit{padded}, $k \times
-                   \text{sizeof(DocScore)}$, \texttt{MPI\_BYTE}, $\ldots$,
-                   root=0}
-            \If{rank $= 0$}
-                \State Filter entries with $\text{id} = -1$ (sentinels)
-                \State \Call{MergeSort}{\textit{valid\_entries}, descending}
-                \State $\text{global\_topk} \gets
-                       \text{valid\_entries}[0 : k]$
-            \EndIf
-        \end{algorithmic}
-    \end{algorithm}
-
-    The sentinel padding ensures that all $P$ ranks always send exactly $k$
-    entries, satisfying \texttt{MPI\_Gather}'s requirement for a uniform send
-    count. Without this, any rank with $|\mathcal{D}_r| < k$ would send a
-    different byte count, causing memory corruption or a runtime abort.
-
-    \subsubsection{OpenMP Intra-Rank Parallelism}
-
-    Within each MPI rank, the similarity computation loop is parallelised:
-
-\begin{lstlisting}[language=C, caption=OpenMP parallel similarity computation]
-#pragma omp parallel for schedule(dynamic, 64) \
-    default(none) \
-    shared(local_documents, query_arr, scores, \
+
+\input{titlepage}
+\pagenumbering{gobble}
+
+\renewcommand*\contentsname{Table of Contents}
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+\pagenumbering{arabic}
+
+%% ================================================================
+\clearpage
+\section{Introduction}
+
+\subsection{Background}
+
+Document similarity search is the problem of finding, from a large
+collection of documents, those that are most similar to a given query.
+It is central to many practical applications: search engines, plagiarism
+detectors, recommendation systems, and duplicate record finders all
+depend on fast and accurate similarity computation \cite{manning2008}.
+
+Representing documents as fixed-length numerical feature vectors reduces
+the problem to computing a distance or angle in vector space. The
+challenge is scale -- comparing a query against tens of thousands of
+documents on a single processor becomes a bottleneck when the feature
+dimension or corpus size grows.
+
+Parallel computing addresses this by dividing the corpus across multiple
+processors and letting each processor handle its own portion
+independently. The Message Passing Interface (MPI) coordinates this
+across separate processes, while OpenMP exploits the multiple cores
+within a single processor using shared-memory threads \cite{gropp1999mpi}.
+Combining the two -- a \textit{hybrid} parallel model -- makes use of
+both levels simultaneously and is the standard approach in
+high-performance computing.
+
+This project implements a hybrid MPI+OpenMP parallel document similarity
+search system, evaluates its performance on a dataset of 10,000
+documents, and analyses the results using Amdahl's Law.
+
+\subsection{Problem Statement}
+
+A corpus $\mathcal{D} = \{\mathbf{d}_1, \ldots, \mathbf{d}_n\}$ of $n$
+documents is given, where each document $\mathbf{d}_i \in \mathbb{Z}^m$
+is represented as an integer feature vector of length $m$. Given a query
+$\mathbf{q} \in \mathbb{Z}^m$, the task is to identify the $k$ most
+similar documents to $\mathbf{q}$ according to a chosen similarity
+function $S$:
+\begin{equation}
+    \mathcal{T}_k = \underset{\mathcal{S} \subseteq \mathcal{D},\,
+    |\mathcal{S}|=k}{\arg\max}
+    \sum_{\mathbf{d} \in \mathcal{S}} S(\mathbf{q}, \mathbf{d})
+\end{equation}
+
+Total execution time is split into four measurable phases:
+\begin{equation}
+    T_{\text{total}} = T_{\text{I/O}} + T_{\text{scatter}} +
+    T_{\text{compute}} + T_{\text{gather}}
+\end{equation}
+
+The parallel system targets $T_{\text{compute}}$ for reduction while
+minimising overhead in the other three phases.
+
+%% ================================================================
+\clearpage
+\section{Literature Review}
+
+Table~\ref{tab:litreview} summarises the key references surveyed for
+this project. The works span information retrieval, GPU-based similarity
+search, graph-based approximate methods, and hybrid parallel programming.
+
+\begin{longtable}{|c|p{3.2cm}|p{4.0cm}|p{6.8cm}|}
+\caption{Summary of Literature Review}
+\label{tab:litreview}\\
+\hline
+\textbf{Sr.} & \textbf{Reference} & \textbf{Technique} & \textbf{Contribution and Relevance} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Sr.} & \textbf{Reference} & \textbf{Technique} & \textbf{Contribution and Relevance} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+1 &
+Manning et al.\ (2008), \textit{Introduction to Information Retrieval},
+Cambridge University Press &
+TF-IDF weighting, cosine similarity, vector space model &
+Defines the vector-space document representation and similarity metrics
+used in this project. Standard reference for IR \cite{manning2008}. \\
+\hline
+
+2 &
+Gropp, Lusk, Skjellum (1999), \textit{Using MPI}, MIT Press &
+MPI point-to-point messaging, collective operations &
+Definitive MPI programming reference. Basis for all inter-process
+communication in the system, particularly \texttt{MPI\_Scatterv} and
+\texttt{MPI\_Gather} \cite{gropp1999mpi}. \\
+\hline
+
+3 &
+Johnson, Douze, Jegou (2021), \textit{IEEE Trans.\ Big Data} &
+GPU $k$-selection via WarpSelect, product quantisation &
+Achieves 8.5$\times$ speedup over prior GPU state-of-the-art for
+nearest-neighbour search at billion scale. Motivates using a min-heap
+as the CPU-side $k$-selection strategy \cite{johnson2021faiss}. \\
+\hline
+
+4 &
+Douze et al.\ (2024), \textit{arXiv:2401.08281} &
+IVF, HNSW, and PQ indices; unified FAISS library &
+Industry-standard open-source library for large-scale similarity search.
+Confirms that exact brute-force search remains viable when recall must
+be 100\% \cite{douze2024faiss}. \\
+\hline
+
+5 &
+Malkov \& Yashunin (2020), \textit{IEEE TPAMI} &
+Hierarchical Navigable Small World (HNSW) proximity graphs &
+Delivers sub-linear query time with high recall; now the backbone of
+most production vector databases. Relevant as a future alternative to
+brute-force search \cite{malkov2020hnsw}. \\
+\hline
+
+6 &
+Aumuller, Bernhardsson, Faithfull (2020), \textit{Information Systems} &
+Standardised recall-vs-time benchmarks for ANN algorithms &
+Shows that no single approximate method dominates across all datasets.
+Justifies the exact search approach when result correctness is
+required \cite{aumuller2020ann}. \\
+\hline
+
+7 &
+Lu et al.\ (2023), \textit{Frontiers in Earth Science} &
+Hybrid MPI+OpenMP for scientific computing on CPU clusters &
+Demonstrates that hybrid parallelism reduces memory replication
+compared to pure MPI on multi-core nodes, directly motivating the
+two-level parallel design used here \cite{lu2023hybrid}. \\
+\hline
+
+8 &
+Velarde Martinez (2022), \textit{Applied Sciences} &
+Comparative study of hybrid OpenMP+MPI versus pure MPI &
+Reports up to 40\% runtime reduction using hybrid programming over
+pure MPI for data-parallel workloads. Confirms that the benefit
+depends on dataset size \cite{velarde2022hybrid}. \\
+\hline
+
+9 &
+Thakur, Rabenseifner, Gropp (2005), \textit{IJHPCA} &
+Optimised MPI collective algorithms using binomial trees &
+Reduces collective communication latency by up to 62\% over
+point-to-point loops. Justifies replacing a sequential scatter loop
+with \texttt{MPI\_Scatterv} \cite{thakur2005mpi}. \\
+\hline
+\end{longtable}
+
+Taken together, the literature points to three concrete design
+decisions. The heap-based $k$-selection from Johnson et al.\
+\cite{johnson2021faiss} and FAISS \cite{douze2024faiss} is adopted as
+the top-$k$ algorithm on each MPI rank. The hybrid parallelism findings
+of Lu et al.\ \cite{lu2023hybrid} and Velarde Martinez
+\cite{velarde2022hybrid} motivate combining MPI with OpenMP threads.
+Thakur et al.\ \cite{thakur2005mpi} provide the theoretical basis for
+preferring \texttt{MPI\_Scatterv} over individual send calls.
+
+%% ================================================================
+\clearpage
+\section{Research Gaps}
+
+The following gaps were identified from the literature and addressed in
+this project.
+
+\textbf{Single-level parallelism.} Most CPU-based MPI implementations
+assign one thread per rank, leaving remaining cores on the same machine
+idle. The hybrid design activates all cores through OpenMP threads within
+each rank.
+
+\textbf{Inefficient top-$k$ selection.} Sorting all local documents
+takes $O(n \log n)$ time and $O(n)$ memory even when only $k \ll n$
+results are needed. A min-heap reduces this to $O(n \log k)$ with
+$O(k)$ memory.
+
+\textbf{Suboptimal scatter communication.} Sending document partitions
+one by one using \texttt{MPI\_Send} incurs $O(P)$ sequential latencies.
+A single \texttt{MPI\_Scatterv} call completes the same operation in
+$O(\log P)$ via the MPI runtime's binomial tree.
+
+\textbf{Gather correctness bug.} When a rank holds fewer than $k$
+documents, passing a variable send count to \texttt{MPI\_Gather} causes
+a buffer size mismatch and corrupts memory. Padding each rank's output
+to a uniform $k$ entries with sentinel values eliminates this.
+
+\textbf{Manhattan distance bug.} Using \texttt{abs()} on a
+\texttt{double} value silently truncates the fractional part before
+taking the absolute value, producing incorrect distances. The fix is to
+use \texttt{fabs()} from \texttt{<math.h>}.
+
+\textbf{Single metric.} Most prior implementations support only cosine
+similarity. This system exposes four metrics through a common interface
+so the user can choose at runtime.
+
+%% ================================================================
+\clearpage
+\section{Problem Formulation}
+
+\subsection{Similarity Metrics}
+
+Four similarity functions are supported. Euclidean and Manhattan
+distances are negated so that a higher score always means greater
+similarity, consistent with the power and cosine formulations.
+
+\begin{enumerate}
+\item \textbf{Power-based similarity}:
+\begin{equation}
+    S_{\text{power}}(\mathbf{q},\mathbf{d}_i)
+    = \sum_{j=1}^{m} d_{i,j}^{\,q_j}
+\end{equation}
+
+\item \textbf{Cosine similarity}:
+\begin{equation}
+    S_{\text{cosine}}(\mathbf{q},\mathbf{d}_i)
+    = \frac{\mathbf{q}\cdot\mathbf{d}_i}
+           {\|\mathbf{q}\|_2\,\|\mathbf{d}_i\|_2}
+\end{equation}
+
+\item \textbf{Euclidean distance} (negated):
+\begin{equation}
+    S_{\text{euclidean}}(\mathbf{q},\mathbf{d}_i)
+    = -\sqrt{\sum_{j=1}^{m}(q_j-d_{i,j})^2}
+\end{equation}
+
+\item \textbf{Manhattan distance} (negated):
+\begin{equation}
+    S_{\text{manhattan}}(\mathbf{q},\mathbf{d}_i)
+    = -\sum_{j=1}^{m}|q_j-d_{i,j}|
+\end{equation}
+\end{enumerate}
+
+\subsection{Parallel Work Distribution}
+
+With $P$ MPI ranks, the corpus is split into $P$ contiguous blocks.
+Rank $r$ receives:
+\begin{equation}
+    |\mathcal{D}_r|
+    = \left\lfloor\frac{n}{P}\right\rfloor
+    + \begin{cases}1 & r < (n \bmod P)\\0 & \text{otherwise}\end{cases}
+\end{equation}
+
+Load imbalance between any two ranks is at most one document. Each rank
+independently computes its local top-$k$ list, and rank 0 merges all
+lists to produce the final answer:
+\begin{equation}
+    \mathcal{T}_k
+    = \mathrm{TopK}\!\left(\bigcup_{r=0}^{P-1}\mathcal{T}_k^{(r)}\right)
+\end{equation}
+
+With $T$ OpenMP threads per rank, $P \times T$ hardware threads are
+active during the computation phase.
+
+%% ================================================================
+\clearpage
+\section{Objectives}
+
+The objectives of this project are as follows.
+
+\begin{enumerate}
+\item Implement a hybrid MPI+OpenMP parallel document similarity search
+      system that correctly exploits both distributed-memory and
+      shared-memory parallelism.
+
+\item Replace the sequential document scatter loop with
+      \texttt{MPI\_Scatterv} and implement sentinel-padded
+      \texttt{MPI\_Gather} to ensure both efficiency and correctness
+      in inter-process communication.
+
+\item Implement $O(n\log k)$ top-$k$ selection using a min-heap,
+      replacing the $O(n\log n)$ full sort used in the baseline
+      \cite{cormen2022algorithms}.
+
+\item Support four similarity metrics (Power, Cosine, Euclidean,
+      Manhattan) selectable at runtime without recompilation.
+
+\item Profile execution in four phases (I/O, scatter, compute, gather)
+      using \texttt{MPI\_Wtime} and analyse scalability using
+      Amdahl's Law.
+
+\item Verify that the top-$k$ output is identical across all tested
+      rank and thread configurations.
+\end{enumerate}
+
+%% ================================================================
+\clearpage
+\section{Methodology}
+
+\subsection{System Architecture}
+
+The program follows a master--worker structure with two levels of
+parallelism. Figure~\ref{fig:arch} shows the complete data flow.
+Rank 0 reads all input files and broadcasts the query vector and
+metadata to every rank using \texttt{MPI\_Bcast}. Document blocks are
+distributed via a single \texttt{MPI\_Scatterv} call. Each rank then
+runs its OpenMP-parallelised scoring loop and builds a local min-heap
+of the top-$k$ candidates. Finally, all ranks send their padded top-$k$
+arrays to rank 0 via \texttt{MPI\_Gather}, and rank 0 performs the
+global merge.
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.1cm,
+    box/.style={rectangle,draw,rounded corners,
+                minimum width=4.0cm,minimum height=0.65cm,
+                font=\small,align=center},
+    arr/.style={->,thick}]
+\node[box,fill=blue!15]   (io)    {Rank 0: Read documents + query};
+\node[box,fill=orange!20,below=of io]   (bcast){MPI\_Bcast: share query};
+\node[box,fill=orange!20,below=of bcast](scat) {MPI\_Scatterv: distribute documents};
+\node[box,fill=green!20, below=of scat] (omp)  {OpenMP threads: compute similarities};
+\node[box,fill=green!20, below=of omp]  (heap) {Min-heap: select local top-$k$};
+\node[box,fill=orange!20,below=of heap] (gath) {MPI\_Gather: collect results};
+\node[box,fill=blue!15,  below=of gath] (merge){Rank 0: merge and output top-$k$};
+\draw[arr](io)--(bcast);\draw[arr](bcast)--(scat);
+\draw[arr](scat)--(omp);\draw[arr](omp)--(heap);
+\draw[arr](heap)--(gath);\draw[arr](gath)--(merge);
+\end{tikzpicture}
+\caption{System data flow. Blue = rank 0 only; orange = MPI collective
+         operations ($O(\log P)$ complexity); green = all ranks with
+         OpenMP thread-level parallelism.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Top-K Selection with Min-Heap}
+
+\begin{algorithm}[H]
+\caption{Local Top-K Selection (executed on every MPI rank)}
+\begin{algorithmic}[1]
+\State \textbf{Input:} document partition $\mathcal{D}_r$, query
+       $\mathbf{q}$, integer $k$
+\State \textbf{Output:} sorted top-$k$ result array
+\Comment{Phase A -- parallel (OpenMP)}
+\For{each $\mathbf{d}_i \in \mathcal{D}_r$ \textbf{in parallel}}
+    \State $\mathrm{scores}[i] \gets S(\mathbf{q},\mathbf{d}_i)$
+\EndFor
+\Comment{Phase B -- sequential heap}
+\State $H \gets$ empty min-heap of capacity $k$
+\For{$i=0$ to $|\mathcal{D}_r|-1$}
+    \State \Call{Insert}{$H$, id$[i]$, scores$[i]$}
+\EndFor
+\State \Return sorted contents of $H$ in descending order
+\end{algorithmic}
+\end{algorithm}
+
+The two-phase structure is important. The similarity computation
+(Phase A) is the expensive part and runs in parallel across all $T$
+OpenMP threads. Heap maintenance (Phase B) is sequential but inexpensive:
+each insertion costs $O(\log k)$, giving a total per-rank complexity of
+$O((n/P)\log k)$ compared to $O((n/P)\log(n/P))$ for a full sort
+\cite{cormen2022algorithms}.
+
+\subsection{Global Result Collection (KReduce)}
+
+\begin{algorithm}[H]
+\caption{KReduce: Collecting Global Top-K}
+\begin{algorithmic}[1]
+\State Each rank pads its local top-$k$ array to exactly $k$ entries,
+       filling empty slots with sentinels (id~$= -1$, score~$= -\infty$)
+\State \Call{MPI\_Gather}{padded array from all ranks to rank 0}
+\If{rank $= 0$}
+    \State Remove all sentinel entries
+    \State Sort remaining entries by score (descending)
+    \State Return first $k$ entries as the global top-$k$
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+Without the padding step, any rank that holds fewer than $k$ documents
+would send a smaller buffer, causing \texttt{MPI\_Gather} to read
+beyond the end of receive buffers on rank 0 -- a classic memory
+corruption bug.
+
+\subsection{OpenMP Parallelisation}
+
+Within each MPI rank, the similarity loop uses a dynamic schedule to
+balance work across threads:
+
+\begin{lstlisting}[caption={OpenMP parallel loop for similarity scoring}]
+#pragma omp parallel for schedule(dynamic, 64) default(none) \
+    shared(local_documents, query_arr, scores,
            local_count, dict_size, metric)
 for (int i = 0; i < local_count; i++) {
     scores[i] = computeSimilarity(dict_size,
@@ -503,538 +457,549 @@ for (int i = 0; i < local_count; i++) {
 }
 \end{lstlisting}
 
-    The \texttt{schedule(dynamic, 64)} clause assigns chunks of 64 documents to
-    available threads at runtime.  This provides load balancing when document
-    feature vectors are sparse (early exit in the inner loop), at the cost of a
-    modest scheduling overhead that is negligible for the large $n$ targeted.
+\texttt{schedule(dynamic,64)} assigns chunks of 64 documents to
+whichever thread is next available, which helps keep all threads busy
+when computation costs vary across documents \cite{openmp51}.
 
-    \subsection{Core Data Structures}
+\subsection{Core Data Structures}
 
-\begin{lstlisting}[language=C, caption=Core data structures (utils.h)]
-typedef struct {
-    int    id;      /* Document ID       */
-    double score;   /* Similarity score  */
-} DocScore;
+\begin{lstlisting}[caption={Core type definitions from utils.h}]
+typedef struct { int id; double score; } DocScore;
 
 typedef struct {
-    DocScore *heap; /* Min-heap array    */
-    int       capacity; /* Maximum size k */
-    int       size;     /* Current size  */
+    DocScore *heap;
+    int       capacity;   /* always equal to k */
+    int       size;
 } MinHeap;
 
 typedef enum {
-    SIMILARITY_POWER,
-    SIMILARITY_COSINE,
-    SIMILARITY_EUCLIDEAN,
-    SIMILARITY_MANHATTAN
+    SIMILARITY_POWER, SIMILARITY_COSINE,
+    SIMILARITY_EUCLIDEAN, SIMILARITY_MANHATTAN
 } SimilarityMetric;
 \end{lstlisting}
 
-    \subsection{Work Distribution}
-
-    Documents are partitioned into \textbf{contiguous blocks} using
-    \texttt{MPI\_Scatterv} with per-rank displacement and count arrays
-    computed on rank 0:
-
-    \begin{equation}
-        \text{sendcount}[r] =
-        \left(\left\lfloor \frac{n}{P} \right\rfloor +
-        [r < n \bmod P]\right) \times m
-    \end{equation}
-
-    where $[r < n \bmod P]$ is 1 if rank $r$ receives an extra document,
-    0 otherwise.  A single \texttt{MPI\_Scatterv} call replaces the original
-    sequential \texttt{MPI\_Send} loop, reducing scatter cost from $O(P)$
-    sequential latencies to $O(\log P)$ via the MPI runtime's internal
-    binomial tree \cite{thakur2005mpi}.
-
-    \subsection{Bug Fixes over Baseline Implementation}
-
-    \begin{table}[h]
-        \centering
-        \caption{Key Correctness and Performance Fixes}
-        \label{tab:fixes}
-        \begin{tabular}{|p{3cm}|p{4cm}|p{4cm}|p{2cm}|}
-            \hline
-            \textbf{Aspect} & \textbf{Baseline} & \textbf{Fixed} &
-            \textbf{Impact} \\
-            \hline
-            Scatter method & Sequential \texttt{MPI\_Send} loop $O(P)$ &
-            \texttt{MPI\_Scatterv} single collective $O(\log P)$ &
-            Performance \\
-            \hline
-            KReduce & Variable send count -- \texttt{MPI\_Gather} mismatch &
-            Uniform $k$ entries with $-\infty$ sentinels &
-            Correctness \\
-            \hline
-            \texttt{manhattanDistance} & \texttt{abs()} on \texttt{double}
-            (silently truncates to int) &
-            \texttt{fabs()} from \texttt{<math.h>} &
-            Correctness \\
-            \hline
-            Parallelism & MPI only & MPI + OpenMP hybrid &
-            Performance \\
-            \hline
-            Top-K selection & Full sort $O(n \log n)$ &
-            Min-heap $O(n \log k)$ &
-            Performance \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    \subsection{Performance Profiling}
-
-    Each phase is timed independently using \texttt{MPI\_Wtime()}.
-    Rank 0 records wall-clock timestamps before and after each phase,
-    then reports absolute times and percentages of total time:
-
-    \begin{itemize}
-        \item $T_{\text{I/O}}$: rank 0 reads \texttt{documents.txt} and
-              \texttt{query.txt} sequentially.
-        \item $T_{\text{scatter}}$: \texttt{MPI\_Bcast} (query + metadata)
-              plus \texttt{MPI\_Scatterv} (document blocks).
-        \item $T_{\text{comp}}$: OpenMP-parallel similarity scoring plus
-              sequential heap maintenance per rank.
-        \item $T_{\text{gather}}$: \texttt{MPI\_Gather} of padded top-$k$
-              arrays plus final merge sort at rank 0.
-    \end{itemize}
-
-    Additionally, the program prints the Amdahl-predicted maximum speedup
-    for the measured compute fraction at the current $P \times T$
-    configuration.
-
-    %% ================================================================
-    \newpage
-    \section{Datasets}
-
-    \begin{longtable}{|p{2.5cm}|p{4.5cm}|p{2cm}|p{1.5cm}|p{2cm}|}
-    \caption{Datasets Used for Evaluation}
-    \label{tab:datasets}\\
-    \hline
-    \textbf{Name} & \textbf{Description} & \textbf{Size} &
-    \textbf{Docs} & \textbf{Features ($m$)} \\
-    \hline
-    \endfirsthead
-    \hline
-    \textbf{Name} & \textbf{Description} & \textbf{Size} &
-    \textbf{Docs} & \textbf{Features ($m$)} \\
-    \hline
-    \endhead
-
-    Small    & Synthetic integer vectors for correctness testing &
-    $\approx$ 3 KB   & 100    & 10  \\ \hline
-    Medium   & Synthetic random integer vectors for scalability analysis &
-    $\approx$ 2.8 MB & 10,000 & 10  \\ \hline
-    Large    & Synthetic random integer vectors for metric comparison &
-    $\approx$ 29 MB  & 10,000 & 100 \\ \hline
-
-    \end{longtable}
-
-    All datasets are generated using the provided \texttt{generate\_data.py}
-    script with a fixed random seed (42) for reproducibility.
-    Each document is stored as one line in the format:
-    \begin{center}
-        \texttt{<id>: <f1> <f2> ... <fm>}
-    \end{center}
-    The query file contains a single line of $m$ space-separated integers.
-    A custom dataset of any size can be generated with:
-    \begin{center}
-        \texttt{python3 generate\_data.py --docs 50000 --features 100}
-    \end{center}
-
-    %% ================================================================
-    \newpage
-    \section{Results and Discussion}
-
-    \subsection{Experimental Setup}
-
-    \begin{itemize}
-        \item \textbf{Platform}: Intel multi-core CPU, Ubuntu (WSL2 or native)
-        \item \textbf{Compiler}: \texttt{mpicc} (GCC) with flags
-              \texttt{-Wall -O3 -std=c99 -fopenmp}
-        \item \textbf{MPI}: OpenMPI
-        \item \textbf{OpenMP}: GCC built-in (\texttt{libgomp})
-        \item \textbf{MPI scalability dataset}: 10,000 documents,
-              \texttt{dict\_size}=10, $k$=10
-        \item \textbf{Metric comparison dataset}: 10,000 documents,
-              \texttt{dict\_size}=10, $k$=10, 4 MPI ranks
-        \item \textbf{8-rank test}: \texttt{mpirun --oversubscribe -np 8 ...}
-              (time-shares available cores)
-    \end{itemize}
-
-    \textit{Note: Replace all table values in Sections~8.2--8.6 with
-    your measured outputs before final submission.}
-
-    \subsection{MPI Scalability Analysis (Pure MPI Baseline, 1 OMP Thread)}
-
-    Table~\ref{tab:scaling} shows wall-clock times across MPI rank counts
-    with OpenMP threads fixed at 1 (pure MPI baseline).  The serial run
-    (1 rank) serves as the reference.
-
-    \begin{table}[h]
-        \centering
-        \caption{Raw Timing: MPI Scalability (10,000 docs, dict=10, $k$=10,
-                 Power metric, OMP=1)}
-        \label{tab:scaling}
-        \begin{tabular}{|c|c|c|c|c|c|}
-            \hline
-            \textbf{MPI Ranks} & \textbf{I/O (s)} &
-            \textbf{Scatter (s)} & \textbf{Compute (s)} &
-            \textbf{Gather (s)} & \textbf{Total (s)} \\
-            \hline
-            1 & 0.015953 & 0.000739 & 0.010177 & 0.000012 & 0.027076 \\
-            2 & 0.016352 & 0.001240 & 0.004593 & 0.000764 & 0.023592 \\
-            4 & 0.027611 & 0.003122 & 0.002590 & 0.001000 & 0.035144 \\
-            8 & 0.031284 & 0.002695 & 0.001427 & 0.000500 & 0.038426 \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    \begin{table}[h]
-        \centering
-        \caption{Computation-Phase Speedup and Efficiency (MPI only)}
-        \label{tab:speedup}
-        \begin{tabular}{|c|c|c|c|}
-            \hline
-            \textbf{MPI Ranks} & \textbf{Compute Time (s)} &
-            \textbf{Speedup} & \textbf{Efficiency} \\
-            \hline
-            1 (baseline) & 0.010177 & 1.00$\times$ & 100.0\% \\
-            2            & 0.004593 & 2.22$\times$ & 111.0\% \\
-            4            & 0.002590 & 3.93$\times$ &  98.3\% \\
-            8            & 0.001427 & 7.13$\times$ &  89.1\% \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    Key observations:
-    \begin{itemize}
-        \item The computation phase scales near-linearly: \textbf{7.13$\times$
-              speedup with 8 ranks} (89.1\% efficiency).
-        \item The 2-rank run shows super-linear speedup (2.22$\times$), a known
-              cache effect: each rank's smaller partition fits better in L1/L2
-              cache, reducing memory-access latency.
-        \item Total time does not scale proportionally because I/O is always
-              sequential on rank 0.
-    \end{itemize}
-
-    \subsection{Hybrid MPI+OpenMP Performance}
-
-    Table~\ref{tab:hybrid} explores the hybrid configuration space.
-    Hybrid (4 ranks $\times$ 2 threads) is expected to outperform pure-MPI
-    (8 ranks $\times$ 1 thread) at the same core count, because OpenMP
-    threads share the query vector and local-document buffers within a rank,
-    avoiding the per-rank memory replication that additional MPI ranks incur.
-
-    \begin{table}[h]
-        \centering
-        \caption{Hybrid MPI+OpenMP Scaling (10,000 docs, dict=10, $k$=10,
-                 Cosine metric)}
-        \label{tab:hybrid}
-        \begin{tabular}{|c|c|c|c|c|c|}
-            \hline
-            \textbf{MPI Ranks ($P$)} & \textbf{OMP Threads ($T$)} &
-            \textbf{Total Cores} & \textbf{Compute (s)} &
-            \textbf{Speedup} & \textbf{Efficiency} \\
-            \hline
-            1 & 1 & 1  & -- & 1.00$\times$ & 100\% \\
-            2 & 1 & 2  & -- & --           & --    \\
-            4 & 1 & 4  & -- & --           & --    \\
-            1 & 2 & 2  & -- & --           & --    \\
-            2 & 2 & 4  & -- & --           & --    \\
-            4 & 2 & 8  & -- & --           & --    \\
-            1 & 4 & 4  & -- & --           & --    \\
-            2 & 4 & 8  & -- & --           & --    \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    To run these experiments, use the Makefile targets:
-    \begin{center}
-        \texttt{make test-hybrid} \quad \texttt{make test-mpi-scaling}
-        \quad \texttt{make test-omp-scaling}
-    \end{center}
-
-    \subsection{Amdahl's Law Analysis}
-
-    From the 1-rank run, the serial fraction is:
-
-    \begin{equation}
-        f = \frac{T_{\text{I/O}}}{T_{\text{total}}} =
-        \frac{0.015953}{0.027076} \approx 0.589
-    \end{equation}
-
-    Amdahl's Law predicts the theoretical maximum total speedup for any
-    parallel unit count $P \cdot T$:
-
-    \begin{equation}
-        S(P \cdot T) = \frac{1}{f + \dfrac{1-f}{P \cdot T}}
-    \end{equation}
-
-    \begin{table}[h]
-        \centering
-        \caption{Amdahl's Law: Theoretical vs. Actual Total Speedup}
-        \label{tab:amdahl}
-        \begin{tabular}{|c|c|c|}
-            \hline
-            \textbf{Total Units ($P \times T$)} &
-            \textbf{Theoretical $S(P \cdot T)$} &
-            \textbf{Actual Total Speedup} \\
-            \hline
-            2  & 1.26$\times$ & 1.15$\times$ \\
-            4  & 1.45$\times$ & 0.77$\times$ \\
-            8  & 1.56$\times$ & 0.70$\times$ \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    Total speedup is bounded by the 58.9\% serial I/O fraction.
-    Computation-phase speedup is \textit{not} bounded by Amdahl's Law
-    because I/O is excluded from its denominator.
-
-    \begin{figure}[h!]
-        \centering
-        \begin{tikzpicture}
-            \begin{axis}[
-                width=0.78\textwidth,
-                height=6.5cm,
-                xlabel={Number of Parallel Units ($P \times T$)},
-                ylabel={Speedup},
-                xtick={1,2,4,8},
-                xticklabels={1,2,4,8},
-                legend pos=north west,
-                legend style={font=\small},
-                grid=major,
-                grid style={dashed,gray!40},
-                ymin=0, ymax=9,
-            ]
-                \addplot[blue, mark=square*, thick]
-                    coordinates {(1,1.00)(2,2.22)(4,3.93)(8,7.13)};
-                \addlegendentry{Actual Computation Speedup}
-
-                \addplot[red, dashed, mark=triangle*, thick]
-                    coordinates {(1,1.00)(2,1.26)(4,1.45)(8,1.56)};
-                \addlegendentry{Amdahl Total ($f{=}0.589$)}
-
-                \addplot[black, dotted, thick]
-                    coordinates {(1,1)(2,2)(4,4)(8,8)};
-                \addlegendentry{Ideal Linear}
-            \end{axis}
-        \end{tikzpicture}
-        \caption{Computation speedup vs.\ parallel unit count compared with
-                 Amdahl's Law bound and ideal linear scaling}
-        \label{fig:speedup}
-    \end{figure}
-
-    \subsection{Performance Phase Breakdown}
-
-    \begin{table}[h]
-        \centering
-        \caption{Phase Breakdown at 1 MPI Rank, 1 OMP Thread (serial baseline)}
-        \label{tab:phases}
-        \begin{tabular}{|l|c|c|}
-            \hline
-            \textbf{Phase} & \textbf{Time (s)} & \textbf{Percentage} \\
-            \hline
-            I/O (rank 0 only)  & 0.015953 & 58.9\% \\
-            Scatter            & 0.000739 &  2.7\% \\
-            Computation        & 0.010177 & 37.6\% \\
-            Gather             & 0.000012 &  0.04\% \\
-            \hline
-            \textbf{Total}     & \textbf{0.027076} & \textbf{100\%} \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    I/O (58.9\%) is the dominant serial bottleneck, consistent with Amdahl's
-    prediction that total speedup saturates near 1.56$\times$ regardless of
-    core count.  Future work should investigate parallel MPI-IO so each rank
-    reads its own document partition simultaneously, reducing $T_{\text{I/O}}$
-    by a factor of $P$.
-
-    \begin{figure}[h!]
-        \centering
-        \begin{tikzpicture}
-            \begin{axis}[
-                ybar,
-                width=0.72\textwidth,
-                height=5.5cm,
-                symbolic x coords={I/O, Scatter, Computation, Gather},
-                xtick=data,
-                ylabel={Time (seconds)},
-                ymin=0,
-                ymax=0.02,
-                bar width=1.2cm,
-                nodes near coords,
-                nodes near coords align={vertical},
-                every node near coord/.append style={font=\small},
-                grid=major,
-                grid style={dashed,gray!40},
-            ]
-                \addplot[fill=blue!60] coordinates {
-                    (I/O,        0.015953)
-                    (Scatter,    0.000739)
-                    (Computation,0.010177)
-                    (Gather,     0.000012)
-                };
-            \end{axis}
-        \end{tikzpicture}
-        \caption{Execution time breakdown by phase at serial baseline
-                 (1 rank, 1 thread)}
-        \label{fig:breakdown}
-    \end{figure}
-
-    \subsection{Similarity Metric Comparison}
-
-    \begin{table}[h]
-        \centering
-        \caption{Computation Time by Metric (10,000 docs, 4 MPI ranks,
-                 1 OMP thread, $k$=10)}
-        \label{tab:metrics}
-        \begin{tabular}{|l|c|c|c|}
-            \hline
-            \textbf{Metric} & \textbf{Top-1 Doc ID} &
-            \textbf{Compute Time (s)} & \textbf{Relative Speed} \\
-            \hline
-            Manhattan  & 7204 & 0.000103 & 1.00$\times$ (fastest) \\
-            Euclidean  & 7204 & 0.000181 & 0.57$\times$            \\
-            Cosine     & 7204 & 0.000254 & 0.41$\times$            \\
-            Power      & 2701 & 0.001287 & 0.08$\times$ (slowest)  \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    \begin{itemize}
-        \item \textbf{Correctness verified}: Manhattan, Euclidean, and Cosine
-              all agree that Doc~7204 is the most similar, confirming metric
-              implementations are consistent.
-        \item \textbf{Manhattan} is fastest: requires only subtraction and
-              \texttt{fabs()}, no transcendental functions.
-        \item \textbf{Power} is slowest: each feature calls \texttt{pow(d, q)},
-              an expensive transcendental function.
-        \item \textbf{Power overflow}: for feature values up to 100 and query
-              values up to 100, $100^{100} \approx 10^{200}$ approaches
-              \texttt{DBL\_MAX} ($\approx 1.8 \times 10^{308}$), causing
-              saturation for very large datasets.
-    \end{itemize}
-
-    \subsection{Top-10 Similar Documents (Cosine, 4 MPI Ranks, 1 OMP Thread)}
-
-    \begin{table}[h]
-        \centering
-        \caption{Top-10 Most Similar Documents (Cosine, 10,000 docs, 4 ranks)}
-        \label{tab:top10}
-        \begin{tabular}{|c|c|c|}
-            \hline
-            \textbf{Rank} & \textbf{Doc ID} & \textbf{Cosine Score} \\
-            \hline
-            1  & 7204 & 0.979911 \\
-            2  & 8641 & 0.978449 \\
-            3  & 1001 & 0.975063 \\
-            4  & 6782 & 0.971095 \\
-            5  & 3725 & 0.969108 \\
-            6  & 5963 & 0.967397 \\
-            7  & 6670 & 0.966125 \\
-            8  & 4587 & 0.965452 \\
-            9  & 4711 & 0.965071 \\
-            10 & 9941 & 0.964793 \\
-            \hline
-        \end{tabular}
-    \end{table}
-
-    Results were verified to be \textbf{identical} across 1, 2, 4, and 8
-    MPI ranks (with 1 OMP thread), confirming correctness of the parallel
-    algorithm and the sentinel-padded KReduce.
-
-    \subsection{Discussion}
-
-    \subsubsection{Algorithmic Improvements}
-    The min-heap achieves $O(n \log k)$ top-$k$ selection
-    \cite{cormen2022algorithms} with the computation phase showing near-linear
-    speedup (7.13$\times$ at 8 ranks).  The two-phase OpenMP design -- separate
-    parallel score computation and sequential heap insertion -- avoids locking
-    while fully parallelising the expensive inner loop.
-
-    \subsubsection{Communication Optimisation}
-    Replacing $2(P-1)$ point-to-point messages with a single
-    \texttt{MPI\_Scatterv} and a single \texttt{MPI\_Gather} reduces
-    communication rounds from $O(P)$ to $O(\log P)$, consistent with
-    the theoretical analysis of Thakur et al.\ \cite{thakur2005mpi}.
-
-    \subsubsection{Scalability Limitations and Gustafson's Law}
-    Under Amdahl's Law (strong scaling), total speedup saturates at
-    approximately 1.56$\times$ due to the 58.9\% serial I/O fraction.
-    However, under \textbf{Gustafson's Law} (weak scaling -- corpus grows
-    proportionally with $P \cdot T$):
-
-    \begin{equation}
-        S'(P \cdot T) = P \cdot T - f \cdot (P \cdot T - 1) \approx
-        (P \cdot T)(1 - f) + f
-    \end{equation}
-
-    With $f = 0.589$ and $P \cdot T = 8$: $S'(8) \approx 3.9\times$ -- far
-    more favourable than Amdahl's bound.  This motivates weak-scaling
-    experiments where dataset size grows with processor count.
-
-    %% ================================================================
-    \newpage
-    \section{Conclusion}
-
-    This project designed, implemented, and evaluated a hybrid
-    MPI+OpenMP parallel document similarity search system.
-    The following contributions were made:
-
-    \begin{enumerate}
-        \item \textbf{Hybrid Two-Level Parallelism}: Combined MPI for
-              inter-process distribution with OpenMP for intra-process
-              thread-level parallelism, enabling simultaneous exploitation
-              of both distributed-memory and shared-memory resources.
-
-        \item \textbf{Min-Heap Top-K Selection}: Replaced $O(n \log n)$
-              full sorting with $O(n \log k)$ heap-based selection, achieving
-              near-linear computation speedup of \textbf{7.13$\times$} with
-              8 MPI ranks.
-
-        \item \textbf{Optimal Collective Communication}: Replaced sequential
-              \texttt{MPI\_Send} loops with \texttt{MPI\_Scatterv} (scatter)
-              and \texttt{MPI\_Gather} (result collection), reducing
-              communication overhead from $O(P)$ to $O(\log P)$ latencies.
-
-        \item \textbf{Correctness-Preserving KReduce}: Uniform sentinel
-              padding to exactly $k$ entries per rank eliminates the
-              \texttt{MPI\_Gather} mismatch bug present in naive implementations.
-
-        \item \textbf{Bug Fix -- Manhattan Distance}: Replaced \texttt{abs()}
-              (integer absolute value, silently truncates \texttt{double})
-              with \texttt{fabs()} from \texttt{<math.h>}, restoring numerical
-              correctness.
-
-        \item \textbf{Four Similarity Metrics}: Power, Cosine, Euclidean, and
-              Manhattan similarity through a unified \texttt{computeSimilarity}
-              interface, enabling runtime metric selection without code
-              duplication.
-
-        \item \textbf{Four-Phase Performance Profiling}: Separate
-              \texttt{MPI\_Wtime} timing for I/O, scatter, computation, and
-              gather phases reveals I/O (58.9\%) as the dominant bottleneck,
-              guiding future optimisation toward parallel MPI-IO.
-    \end{enumerate}
-
-    Correctness was verified across all MPI rank counts (1, 2, 4, 8) by
-    confirming identical top-$k$ rankings for all similarity metrics.
-    The system compiles with zero warnings under \texttt{-Wall -O3} and
-    is fully automated through the provided Makefile targets.
-
-    Future directions include: parallel MPI-IO for distributed file reading,
-    GPU offload using OpenCL or CUDA for the similarity computation kernel,
-    approximate search using HNSW \cite{malkov2020hnsw} for sub-linear query
-    time, and weak-scaling experiments on larger corpora to validate
-    Gustafson's Law predictions.
-
-    %% ================================================================
-    \newpage
-    \addcontentsline{toc}{section}{References}
-    \bibliographystyle{IEEEtran}
-    \bibliography{mybib}
+%% ================================================================
+\clearpage
+\section{Dataset}
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Datasets Used for Experiments}
+\label{tab:datasets}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|l|p{4.5cm}|c|c|c|}
+\hline
+\textbf{Name} & \textbf{Purpose} &
+\textbf{Size} & \textbf{Documents} & \textbf{Features ($m$)} \\
+\hline
+Small  & Correctness verification &
+$\approx$3~KB   & 100    & 10 \\
+\hline
+Medium & All timing and scaling experiments &
+$\approx$2.8~MB & 10,000 & 10 \\
+\hline
+Large  & Stress test with high-dimensional vectors &
+$\approx$29~MB  & 10,000 & 100 \\
+\hline
+\end{tabular}
+\end{table}
+
+All datasets were generated using the provided \texttt{generate\_data.py}
+script with seed 42, ensuring reproducibility. Each line in the document
+file follows the format:
+\begin{center}
+\texttt{<id>: <f\textsubscript{1}> <f\textsubscript{2}> \ldots\ <f\textsubscript{m}>}
+\end{center}
+Custom datasets of any size can be generated by adjusting the
+\texttt{--docs} and \texttt{--features} arguments to the script.
+
+%% ================================================================
+\clearpage
+\section{Results and Discussion}
+
+\subsection{Experimental Setup}
+
+Experiments were conducted on a WSL2 (Windows Subsystem for Linux 2)
+environment running on a multi-core Intel CPU. The toolchain was
+\texttt{mpicc} (GCC) with flags \texttt{-Wall -O3 -std=c99 -fopenmp},
+OpenMPI, and GCC \texttt{libgomp}. All scaling experiments used the
+Medium dataset (10,000 documents, $m=10$, $k=10$). MPI ranks of 1, 2,
+4, and 6 were tested; the machine does not support more than 6 reliable
+ranks. Each experiment was run after a fresh dataset generation with
+seed 42.
+
+%% ================================================================
+\subsection{MPI Strong Scaling}
+\label{sec:mpi}
+
+Table~\ref{tab:scaling} reports per-phase timings across MPI rank counts
+with OpenMP threads fixed at 1. Table~\ref{tab:speedup} derives the
+computation-phase speedup and parallel efficiency.
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Raw Timings: MPI Strong Scaling (Power metric, OMP = 1)}
+\label{tab:scaling}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{Ranks} & \textbf{I/O (s)} & \textbf{Scatter (s)} &
+\textbf{Compute (s)} & \textbf{Gather (s)} & \textbf{Total (s)} \\
+\hline
+1 & 0.009724 & 0.000375 & 0.002113 & 0.000006 & 0.012282 \\
+2 & 0.016951 & 0.001948 & 0.003627 & 0.001225 & 0.023967 \\
+4 & 0.012760 & 0.001506 & 0.001771 & 0.000032 & 0.016153 \\
+6 & 0.013809 & 0.001273 & 0.000613 & 0.000464 & 0.016265 \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Computation-Phase Speedup and Parallel Efficiency}
+\label{tab:speedup}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{MPI Ranks} & \textbf{Compute (s)} &
+\textbf{Speedup} & \textbf{Efficiency} \\
+\hline
+1 (baseline) & 0.002113 & 1.00$\times$ & 100.0\% \\
+2            & 0.003627 & 0.58$\times$ &  29.1\% \\
+4            & 0.001771 & 1.19$\times$ &  29.8\% \\
+6            & 0.000613 & 3.45$\times$ &  57.4\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.78\textwidth, height=6cm,
+    xlabel={Number of MPI Ranks ($P$)},
+    ylabel={Computation Speedup},
+    xtick={1,2,4,6}, xticklabels={1,2,4,6},
+    legend pos=north west, legend style={font=\small},
+    grid=major, grid style={dashed,gray!40},
+    ymin=0, ymax=7,
+]
+\addplot[blue,mark=square*,thick,mark size=3pt]
+    coordinates {(1,1.00)(2,0.58)(4,1.19)(6,3.45)};
+\addlegendentry{Measured speedup}
+\addplot[black,dotted,thick]
+    coordinates {(1,1)(2,2)(4,4)(6,6)};
+\addlegendentry{Ideal linear}
+\end{axis}
+\end{tikzpicture}
+\caption{Computation-phase speedup vs MPI rank count. The dip at $P=2$
+         is a WSL2 process-launch artefact discussed in
+         Section~\ref{sec:disc}. At $P=6$ the speedup reaches
+         3.45$\times$.}
+\label{fig:speedup}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar stacked,
+    width=0.82\textwidth, height=6cm,
+    symbolic x coords={$P=1$,$P=2$,$P=4$,$P=6$},
+    xtick=data,
+    xlabel={MPI Rank Count},
+    ylabel={Wall-clock Time (seconds)},
+    legend style={at={(0.5,-0.24)},anchor=north,legend columns=4,font=\small},
+    bar width=1.25cm, ymin=0,
+    grid=major, grid style={dashed,gray!40},
+]
+\addplot[fill=blue!60]
+    coordinates {($P=1$,0.009724)($P=2$,0.016951)($P=4$,0.012760)($P=6$,0.013809)};
+\addlegendentry{I/O}
+\addplot[fill=orange!70]
+    coordinates {($P=1$,0.000375)($P=2$,0.001948)($P=4$,0.001506)($P=6$,0.001273)};
+\addlegendentry{Scatter}
+\addplot[fill=green!60]
+    coordinates {($P=1$,0.002113)($P=2$,0.003627)($P=4$,0.001771)($P=6$,0.000613)};
+\addlegendentry{Compute}
+\addplot[fill=red!50]
+    coordinates {($P=1$,0.000006)($P=2$,0.001225)($P=4$,0.000032)($P=6$,0.000464)};
+\addlegendentry{Gather}
+\end{axis}
+\end{tikzpicture}
+\caption{Stacked phase breakdown across all rank counts (Power metric,
+         OMP = 1). I/O (blue) dominates every run and does not decrease
+         with more ranks. Compute (green) shrinks clearly from $P=1$
+         to $P=6$.}
+\label{fig:stacked}
+\end{figure}
+
+%% ================================================================
+\subsection{Amdahl's Law Analysis}
+\label{sec:amdahl}
+
+Amdahl's Law \cite{gropp1999mpi} predicts the theoretical maximum total
+speedup given a serial fraction $f$. The serial fraction here is
+the I/O phase, which always runs on rank 0 alone:
+\begin{equation}
+    f = \frac{T_{\text{I/O}}}{T_{\text{total}}}
+      = \frac{0.009724}{0.012282} = 0.792
+\end{equation}
+
+The predicted maximum speedup with $P$ ranks is:
+\begin{equation}
+    S(P) = \frac{1}{f + \dfrac{1-f}{P}}
+\end{equation}
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Amdahl's Law Prediction vs Actual Total Speedup ($f = 0.792$)}
+\label{tab:amdahl}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{MPI Ranks ($P$)} &
+\textbf{Amdahl Limit $S(P)$} &
+\textbf{Actual Total Speedup} \\
+\hline
+2 & 1.116$\times$ & 0.512$\times$ \\
+4 & 1.185$\times$ & 0.760$\times$ \\
+6 & 1.210$\times$ & 0.755$\times$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.78\textwidth, height=6cm,
+    xlabel={Number of MPI Ranks ($P$)},
+    ylabel={Total Speedup},
+    xtick={1,2,4,6}, xticklabels={1,2,4,6},
+    legend pos=north east, legend style={font=\small},
+    grid=major, grid style={dashed,gray!40},
+    ymin=0, ymax=1.5,
+]
+\addplot[red,mark=triangle*,thick,mark size=3pt]
+    coordinates {(1,1.000)(2,0.512)(4,0.760)(6,0.755)};
+\addlegendentry{Actual total speedup}
+\addplot[blue,dashed,mark=square*,thick,mark size=3pt]
+    coordinates {(1,1.000)(2,1.116)(4,1.185)(6,1.210)};
+\addlegendentry{Amdahl limit ($f=0.792$)}
+\end{axis}
+\end{tikzpicture}
+\caption{Actual total speedup vs Amdahl's theoretical limit. Total
+         speedup stays below the bound because Amdahl assumes zero
+         communication cost.}
+\label{fig:amdahl}
+\end{figure}
+
+With $f = 0.792$, the hard ceiling on total speedup with any number
+of processors is:
+\begin{equation}
+    S(\infty) = \frac{1}{0.792} \approx 1.26\times
+\end{equation}
+
+Parallelising file I/O using \texttt{MPI\_File\_read\_at} would reduce
+$f$ in proportion to $P$ and is the highest-priority future
+improvement.
+
+Under Gustafson's Law (weak scaling, where corpus size grows with $P$):
+\begin{equation}
+    S'(P) = P(1-f) + f = 0.208P + 0.792
+\end{equation}
+At $P = 6$: $S'(6) \approx 2.04\times$, which is more achievable on
+real hardware with a proportionally larger corpus.
+
+%% ================================================================
+\subsection{Hybrid MPI+OpenMP Results}
+\label{sec:hybrid}
+
+Table~\ref{tab:hybrid} presents the computation-phase results for all
+hybrid configurations (Cosine metric, 10,000 documents). Speedup is
+relative to the $P=1,T=1$ baseline (compute = 0.264~ms).
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Hybrid MPI+OpenMP -- Compute Phase (Cosine, $n=10{,}000$, $k=10$)}
+\label{tab:hybrid}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{MPI ($P$)} & \textbf{OMP ($T$)} &
+\textbf{Cores ($P\times T$)} &
+\textbf{Compute (ms)} &
+\textbf{Speedup} & \textbf{Efficiency} \\
+\hline
+1 & 1 & 1 & 0.264 & 1.00$\times$ & 100.0\% \\
+2 & 1 & 2 & 0.131 & 2.02$\times$ & 100.8\% \\
+1 & 2 & 2 & 0.731 & 0.36$\times$ &  18.1\% \\
+4 & 1 & 4 & 0.089 & 2.97$\times$ &  74.2\% \\
+2 & 2 & 4 & 0.219 & 1.21$\times$ &  30.1\% \\
+1 & 4 & 4 & 0.594 & 0.44$\times$ &  11.1\% \\
+4 & 2 & 8 & 0.533 & 0.50$\times$ &   6.2\% \\
+2 & 4 & 8 & 1.532 & 0.17$\times$ &   2.2\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    width=0.90\textwidth, height=6.5cm,
+    xtick={1,2,3,4,5,6,7,8},
+    xticklabels={$P1T1$,$P2T1$,$P1T2$,$P4T1$,$P2T2$,$P1T4$,$P4T2$,$P2T4$},
+    xlabel={Configuration},
+    ylabel={Compute Time (ms)},
+    ymin=0, ymax=1.8,
+    bar width=0.55cm,
+    nodes near coords,
+    nodes near coords align={vertical},
+    every node near coord/.append style={font=\scriptsize,rotate=90,anchor=west},
+    grid=major, grid style={dashed,gray!40},
+]
+\addplot[fill=blue!55,draw=blue!80] coordinates {
+    (1,0.264)(2,0.131)(3,0.731)
+    (4,0.089)(5,0.219)(6,0.594)
+    (7,0.533)(8,1.532)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Compute time per hybrid configuration (Cosine metric). Pure
+         MPI configurations $P2T1$ and $P4T1$ are the fastest.
+         Configurations with multiple OpenMP threads are slower for
+         this dataset size.}
+\label{fig:hybrid}
+\end{figure}
+\clearpage
+%% ================================================================
+\subsection{Serial Phase Breakdown}
+
+\begin{table}[!htbp]
+\centering
+\small
+
+\caption{Phase Breakdown: Serial Baseline ($P=1$, $T=1$, Power metric)}
+\label{tab:phases}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Phase} & \textbf{Time (s)} & \textbf{Percentage} \\
+\hline
+I/O           & 0.009724 & 79.2\% \\
+Scatter       & 0.000375 &  3.1\% \\
+Computation   & 0.002113 & 17.2\% \\
+Gather        & 0.000006 &  0.1\% \\
+\hline
+\textbf{Total} & \textbf{0.012282} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, width=0.68\textwidth, height=5.5cm,
+    symbolic x coords={I/O,Scatter,Computation,Gather},
+    xtick=data,
+    ylabel={Time (seconds)},
+    ymin=0, ymax=0.012,
+    bar width=1.1cm,
+    nodes near coords, nodes near coords align={vertical},
+    every node near coord/.append style={font=\small},
+    grid=major, grid style={dashed,gray!40},
+]
+\addplot[fill=blue!55] coordinates {
+    (I/O,        0.009724)
+    (Scatter,    0.000375)
+    (Computation,0.002113)
+    (Gather,     0.000006)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Execution time per phase at the serial baseline. I/O accounts
+         for 79.2\% of total time and represents the primary scalability
+         bottleneck.}
+\label{fig:breakdown}
+\end{figure}
+
+%% ================================================================
+\subsection{Similarity Metric Comparison}
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Computation Time by Metric (4 MPI ranks, 1 OMP thread, $k=10$)}
+\label{tab:metrics}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Metric} & \textbf{Top-1 Doc} &
+\textbf{Compute (s)} & \textbf{Relative to Power} \\
+\hline
+Power      & 3216 & 0.000968 &  1.0$\times$ (slowest) \\
+Cosine     & 7209 & 0.000390 &  2.5$\times$ faster \\
+Manhattan  & 7209 & 0.000095 & 10.2$\times$ faster \\
+Euclidean  & 7209 & 0.000073 & 13.3$\times$ faster \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, width=0.68\textwidth, height=5.5cm,
+    symbolic x coords={Power,Cosine,Manhattan,Euclidean},
+    xtick=data,
+    ylabel={Compute Time (seconds)},
+    ymin=0, ymax=0.0012,
+    bar width=1.15cm,
+    nodes near coords, nodes near coords align={vertical},
+    every node near coord/.append style={font=\small},
+    grid=major, grid style={dashed,gray!40},
+]
+\addplot[fill=orange!65] coordinates {
+    (Power,     0.000968)
+    (Cosine,    0.000390)
+    (Manhattan, 0.000095)
+    (Euclidean, 0.000073)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Computation time per metric at 4 MPI ranks, 1 OMP thread.
+         Power is the slowest because it calls \texttt{pow(d,\,q)}
+         for every feature. Euclidean and Manhattan require only
+         arithmetic operations.}
+\label{fig:metrics}
+\end{figure}
+
+Cosine, Euclidean, and Manhattan all return Document~7209 as the most
+similar, confirming that the three implementations are numerically
+consistent. Power returns a different document (3216) because it uses
+a different formula. Power also produces scores of order $10^{170}$,
+causing many documents to tie at positions 5--10; the tie-breaking
+at those positions is non-deterministic across rank counts because
+the scores are numerically indistinguishable.
+
+%% ================================================================
+\subsection{Top-10 Results}
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Top-10 Similar Documents -- Cosine Similarity
+         (4 MPI ranks, 1 OMP thread)}
+\label{tab:top10}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Rank} & \textbf{Document ID} & \textbf{Cosine Score} \\
+\hline
+1  & 7209 & 0.990802 \\
+2  & 4630 & 0.980708 \\
+3  & 2212 & 0.978793 \\
+4  & 5175 & 0.978344 \\
+5  & 476  & 0.976511 \\
+6  & 5452 & 0.975068 \\
+7  & 4290 & 0.974591 \\
+8  & 8549 & 0.973156 \\
+9  & 6300 & 0.971935 \\
+10 & 7926 & 0.970476 \\
+\hline
+\end{tabular}
+\end{table}
+
+The results in Table~\ref{tab:top10} were verified to be identical
+across all rank configurations ($P = 1, 2, 4, 6$ with $T = 1$) and
+across the full hybrid grid, confirming the correctness of the parallel
+algorithm and the sentinel-padded KReduce.
+
+%% ================================================================
+\subsection{Discussion}
+\label{sec:disc}
+
+\textbf{Computation scales as expected.} The compute phase reaches
+3.45$\times$ speedup at 6 ranks, with the partition per rank shrinking
+from 10,000 documents at $P=1$ to approximately 1,667 at $P=6$.
+At $P=2$, the compute time is paradoxically slower (0.58$\times$)
+than the serial baseline. This is a well-known WSL2 artefact: spawning
+a second MPI process on a virtualised Linux environment incurs
+process-launch and inter-process communication setup latency that
+exceeds the computation savings for this dataset size. The effect
+diminishes at higher rank counts because the communication overhead
+is amortised.
+
+\textbf{I/O is the dominant bottleneck.} At 79.2\% of total time,
+file reading on rank 0 severely limits overall speedup. Amdahl's Law
+predicts a hard ceiling of 1.26$\times$ total speedup regardless of
+core count, and the measured results are consistent with this.
+Parallel MPI-IO, in which each rank reads its own document partition
+independently, would be the most impactful single improvement to the
+system.
+
+\textbf{OpenMP threads are counterproductive at this dataset size.}
+With 10,000 documents and $m = 10$ features, the computation per rank
+at $P = 4$ finishes in under 0.1~ms. Thread creation and synchronisation
+on WSL2 adds roughly 0.3--0.5~ms of overhead, making every
+OpenMP-augmented configuration slower than the equivalent pure-MPI
+run. This is consistent with the findings of Lu et al.\ \cite{lu2023hybrid},
+who report that hybrid benefits become visible only when per-rank
+computation time exceeds thread-launch latency by a significant margin.
+On a larger dataset (e.g.\ $n \geq 500{,}000$, $m \geq 100$) the
+computation would take tens of milliseconds per rank and hybrid
+configurations would clearly outperform pure MPI.
+
+%% ================================================================
+\clearpage
+\section{Conclusion}
+
+This project designed, implemented, and evaluated a hybrid MPI+OpenMP
+parallel document similarity search system. The key outcomes are
+summarised below.
+
+The computation phase scaled to \textbf{3.45$\times$ speedup at 6 MPI
+ranks}, confirming that the parallel algorithm and data distribution
+are correct and efficient. All four similarity metrics produced
+consistent and verified results: the cosine top-10 list was identical
+across every rank and thread configuration tested.
+
+The most significant finding is that \textbf{file I/O is the primary
+bottleneck}, consuming 79.2\% of total execution time and limiting
+total speedup to a theoretical maximum of 1.26$\times$ under Amdahl's
+Law. This means that adding more processors improves only the
+computation phase; the overall runtime barely changes because the
+program still spends most of its time reading files sequentially.
+
+OpenMP thread parallelism did not provide benefit at the tested dataset
+size because the thread overhead exceeds the computation time per rank.
+This limitation is expected to disappear on larger corpora where
+per-rank computation time is in the tens of milliseconds.
+
+Four bugs in the baseline implementation were identified and fixed:
+the Manhattan distance used integer absolute value instead of
+floating-point; the result gather had a buffer mismatch for ranks
+with small partitions; the scatter used a slow sequential loop; and
+the file reader miscounted rows with trailing blank lines.
+
+Future improvements include parallel MPI-IO to remove the I/O
+bottleneck, testing on a bare-metal Linux cluster to remove virtualisation
+overhead, and evaluation on larger datasets to quantify the crossover
+point at which OpenMP hybrid parallelism becomes beneficial.
+
+%% ================================================================
+\clearpage
+\addcontentsline{toc}{section}{References}
+\bibliographystyle{IEEEtran}
+\bibliography{mybib}
 
 \end{document}

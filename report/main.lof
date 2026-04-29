@@ -1,2 +1,0 @@
-\contentsline {figure}{\numberline {1}{\ignorespaces Computation speedup vs.\ parallel unit count compared with Amdahl's Law bound and ideal linear scaling}}{20}{figure.caption.8}%
-\contentsline {figure}{\numberline {2}{\ignorespaces Execution time breakdown by phase at serial baseline (1 rank, 1 thread)}}{20}{figure.caption.10}%
